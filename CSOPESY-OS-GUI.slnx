@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="examples/example_glfw_opengl3/example_glfw_opengl3.vcxproj" />
+</Solution>
