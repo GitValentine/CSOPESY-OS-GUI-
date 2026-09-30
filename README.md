@@ -2,7 +2,7 @@
 
 
 
-A desktop-style operating system mock-up built using \*\*Dear ImGui, GLFW, OpenGL, and C++\*\* for CSOPESY Semi-Major Output 2.
+A desktop-style operating system mock-up built using \*\*Dear ImGui, GLFW, OpenGL, and C++\*\*
 
 
 
