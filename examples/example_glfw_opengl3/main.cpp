@@ -11,6 +11,9 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <stdio.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#include <vector>
 #define GL_SILENCE_DEPRECATION
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <GLES2/gl2.h>
@@ -33,6 +36,42 @@ static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
+
+//Start of additions - Kyan
+enum class stateScreen
+{
+    BootupInfo,
+    loadingScreen,
+    desktopHome
+};
+//image loader
+bool loadImage(const char* filename, GLuint* tTexture, int* tWidth, int* tHeight)
+{
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+
+
+    unsigned char* imageData = stbi_load(filename, &width, &height, &channels, 4);
+    if (imageData == nullptr)
+    {
+        return false;
+    }
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
+
+    stbi_image_free(imageData);
+    *tTexture = texture;
+    *tWidth = width;
+    *tHeight = height;
+
+    return true;
+}
+//End of additions - Kyan
 
 // Main code
 int main(int, char**)
@@ -98,6 +137,14 @@ int main(int, char**)
 #endif
     ImGui_ImplOpenGL3_Init(glsl_version);
 
+    GLuint vaultBoyTexture = 0;
+    int vaultBoyX = 0;
+    int vaultBoyY = 0;
+    bool loadVaultBoy = loadImage("assets/vaultboy/frame_000_delay-0.1s.png", &vaultBoyTexture, &vaultBoyX, &vaultBoyY);
+    if (!loadVaultBoy)
+    {
+        printf("Failed to load image");
+    }
     // Load Fonts
     // - If fonts are not explicitly loaded, Dear ImGui will select an embedded font: either AddFontDefaultVector() or AddFontDefaultBitmap().
     //   This selection is based on (style.FontSizeBase * style.FontScaleMain * style.FontScaleDpi) reaching a small threshold.
@@ -107,6 +154,12 @@ int main(int, char**)
     // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use FreeType for higher quality font rendering.
     // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
     // - Our Emscripten build process allows embedding fonts to be accessible at runtime from the "fonts/" folder. See Makefile.emscripten for details.
+
+     //Start of additions - Kyan
+    ImFont* falloutFont = io.Fonts->AddFontFromFileTTF("../../misc/fonts/Px437_Verite_8x16.ttf", 12.0f * main_scale);
+    IM_ASSERT(falloutFont != nullptr);
+    //End of additions - Kyan
+    // 
     //style.FontSizeBase = 20.0f;
     //io.Fonts->AddFontDefaultVector();
     //io.Fonts->AddFontDefaultBitmap();
@@ -121,6 +174,30 @@ int main(int, char**)
     bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+
+    //Start of additions - Kyan
+    stateScreen currScreen = stateScreen::BootupInfo;
+    double stateStartTime = glfwGetTime();
+    std::vector<GLuint> vaultBoyFrames;
+    int vaultBoyWidth = 0;
+    int vaultBoyHeight = 0;
+        for (int i = 0; i < 19; i++)
+        {
+            char path[128];
+            sprintf_s(path, "assets/vaultboy/frame_%03d_delay-0.1s.png", i);
+            GLuint texture = 0;
+            int width = 0;
+            int height = 0;
+
+            if (loadImage(path, &texture, &width, &height))
+            {
+                vaultBoyFrames.push_back(texture);
+                vaultBoyWidth = width;
+                vaultBoyHeight = height;
+            }
+        }
+    //End of additions - Kyan
 
     // Main loop
 #ifdef __EMSCRIPTEN__
@@ -149,42 +226,397 @@ int main(int, char**)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        //Start of additions - Kyan
+        double timePassed = glfwGetTime() - stateStartTime;
+
+        if (currScreen == stateScreen::BootupInfo)
+        {
+            //Positioning
+            ImGui::SetNextWindowPos(ImVec2(0, 0));
+            ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+
+            //Colors
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.35f, 1.0f, 0.35f, 1.0f));
+
+            //Make background transparent for new background
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+
+            
+            //Startup rules and text
+            ImGui::Begin("BootupInfo", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+
+            //Background changes
+            ImVec2 windowPos = ImGui::GetWindowPos();
+            ImVec2 windowSize = ImGui::GetWindowSize();
+
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+            ImU32 topColor = IM_COL32(0, 15, 1, 255);
+            ImU32 midColor = IM_COL32(0, 35, 15, 255);
+            ImU32 botColor = IM_COL32(0, 20, 1, 255);
+
+            float midY = windowPos.y + (windowSize.y * 0.42f);
+
+            drawList->AddRectFilledMultiColor(windowPos, ImVec2(windowPos.x + windowSize.x, midY), topColor, topColor, midColor, midColor);
+            drawList->AddRectFilledMultiColor(ImVec2(windowPos.x, midY), ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y), midColor, midColor, botColor, botColor);
+
+            float edgeWidth = windowSize.x * 0.12f;
+            drawList->AddRectFilledMultiColor(windowPos, ImVec2(windowPos.x + edgeWidth, windowPos.y + windowSize.y),
+                IM_COL32(0, 0, 0, 110), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 110));
+            drawList->AddRectFilledMultiColor(ImVec2(windowPos.x + windowSize.x - edgeWidth, windowPos.y), ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y),
+                IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 110), IM_COL32(0, 0, 0, 110), IM_COL32(0, 0, 0, 0));
+
+            //Text content and size adjusting and font
+            ImGui::PushFont(falloutFont);
+            float screenWidth = ImGui::GetIO().DisplaySize.x;
+            float textScaling = screenWidth / 1280.0f;
+            textScaling *= 1.6f;
+
+            if (textScaling < 1.2f)
+                textScaling = 1.2f;
+
+            if (textScaling > 2.0f)
+                textScaling = 2.0f;
+
+            ImGui::SetWindowFontScale(textScaling);
+
+            //Left side of screen
+            ImGui::Text("VAULT-TEC OS (A CSOPESY PROJECT)");
+            ImGui::Separator();
+
+            if(timePassed >= 0.6f)
+                ImGui::Text("-=Vault-Tec Megatrends BIOS v1.07=-");
+
+            if (timePassed >= 1.0f)
+                ImGui::Text("[Copyright (C) 2077 Vault-Tec Industries]");
+                ImGui::Spacing();
+
+            if (timePassed >= 1.4f)
+                ImGui::Text("MEMORY TEST .............. 64000K OK");
+
+            if (timePassed >= 1.8f)
+                ImGui::Text("CPU ...................... ONLINE");
+
+            if (timePassed >= 2.2f)
+                ImGui::Text("DISPLAY ADAPTER .......... ONLINE");
+
+            if (timePassed >= 2.6f)
+                ImGui::Text("I/O CONTROLLER ........... ONLINE");
+
+            if (timePassed >= 3.0f)
+                ImGui::Text("PRIMARY STORAGE .......... ONLINE");
+                ImGui::Spacing();
+
+            //Right side of screen
+            float rightPanelX = windowSize.x * 0.60f;
+            float rightPanelY = 100.0f;
+
+            if (timePassed >= 3.4f)
+            {
+                ImGui::SetCursorPos(ImVec2(rightPanelX, rightPanelY));
+                ImGui::Text("[ SYSTEM STATUS ]");
+            }
+
+            if (timePassed >= 3.8f)
+            {
+                ImGui::SetCursorPos(ImVec2(rightPanelX, rightPanelY + 35.0f));
+                ImGui::Text("BOOT MODE ........... NORMAL");
+            }
+
+            if (timePassed >= 4.2f)
+            {
+                ImGui::SetCursorPos(ImVec2(rightPanelX, rightPanelY + 65.0f));
+                ImGui::Text("SECURITY ............ ACTIVE");
+            }
+
+            if (timePassed >= 4.6f)
+            {
+                ImGui::SetCursorPos(ImVec2(rightPanelX, rightPanelY + 95.0f));
+                ImGui::Text("POWER ............... STABLE");
+            }
+
+            if (timePassed >= 5.0f)
+            {
+                ImGui::SetCursorPos(ImVec2(rightPanelX, rightPanelY + 125.0f));
+                ImGui::Text("NETWORK ............. OFFLINE");
+            }
+
+            if (timePassed >= 5.4f)
+            {
+                ImGui::SetCursorPos(ImVec2(rightPanelX, rightPanelY + 155.0f));
+                ImGui::Text("TERMINAL ID ......... VT-01");
+            }
+
+                
+
+            // Bottom side of screen
+            float botBarY = windowSize.y - 120.0f;
+            drawList->AddLine(ImVec2(30.0f, botBarY), ImVec2(windowSize.x - 30.0f, botBarY), IM_COL32(70, 235, 105, 180), 2.0f);
+
+            if (timePassed >= 6.2f)
+            {
+                ImGui::SetCursorPos(ImVec2(35.0f, botBarY + 20.0f));
+                ImGui::Text("> SYSTEM DIAGNOSTICS COMPLETE");
+            }
+            
+
+            if (timePassed >= 6.8f)
+            {
+                float initiationProgress = (float)((timePassed - 6.8f) / 2.0f);
+                if(initiationProgress > 1.0f)
+                {
+                    initiationProgress = 1.0f;
+                }
+                int initiationPercentage = (int)(initiationProgress * 100.0f);
+                ImGui::SetCursorPos(ImVec2(35.0f, botBarY + 55.0f));
+                ImGui::Text("> INITIATING BOOTUP SEQUENCE...%d%%", initiationPercentage);
+            }
+
+
+            //CRT like lines for classic feel
+            for (float y = windowPos.y; y < windowPos.y + windowSize.y; y += 3.0f)
+            {
+                drawList->AddLine(ImVec2(windowPos.x, y), ImVec2(windowPos.x + windowSize.x, y), IM_COL32(0, 0, 0, 170), 1.0f);
+            }
+
+            ImGui::PopFont();
+            ImGui::End();
+
+
+            ImGui::PopStyleColor(2);
+
+            if (timePassed >= 8.9)
+            {
+                currScreen = stateScreen::loadingScreen;
+                stateStartTime = glfwGetTime();
+            }
+        }
+
+            else if (currScreen == stateScreen::loadingScreen)
+            {
+                ImGui::SetNextWindowPos(ImVec2(0, 0));
+                ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+                ImGui::Begin("LoadingScreen", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse);
+
+                //background
+                ImVec2 windowPos = ImGui::GetWindowPos();
+                ImVec2 windowSize = ImGui::GetWindowSize();
+
+                ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+                ImU32 topColor = IM_COL32(0, 15, 1, 255);
+                ImU32 midColor = IM_COL32(0, 35, 15, 255);
+                ImU32 botColor = IM_COL32(0, 20, 1, 255);
+
+                float midY = windowPos.y + (windowSize.y * 0.42f);
+
+                drawList->AddRectFilledMultiColor(windowPos, ImVec2(windowPos.x + windowSize.x, midY), topColor, topColor, midColor, midColor);
+                drawList->AddRectFilledMultiColor(ImVec2(windowPos.x, midY), ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y), midColor, midColor, botColor, botColor);
+
+                float edgeWidth = windowSize.x * 0.12f;
+                drawList->AddRectFilledMultiColor(windowPos, ImVec2(windowPos.x + edgeWidth, windowPos.y + windowSize.y),
+                    IM_COL32(0, 0, 0, 110), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 110));
+                drawList->AddRectFilledMultiColor(ImVec2(windowPos.x + windowSize.x - edgeWidth, windowPos.y), ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y),
+                    IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 110), IM_COL32(0, 0, 0, 110), IM_COL32(0, 0, 0, 0));
+
+
+                //Text content and size adjusting and font
+                ImGui::PushFont(falloutFont);
+                float screenWidth = ImGui::GetIO().DisplaySize.x;
+                float textScaling = screenWidth / 1280.0f;
+                textScaling *= 1.6f;
+
+                if (textScaling < 1.2f)
+                    textScaling = 1.2f;
+
+                if (textScaling > 2.0f)
+                    textScaling = 2.0f;
+
+                ImGui::SetWindowFontScale(textScaling);
+               
+
+                // loading gif, ascii art and placement of both
+                
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.35f, 1.0f, 0.35f, 1.0f));
+                float centerX = windowSize.x * 0.5f;
+
+                const char* vaultAscii = R"(                ██╗   ██╗ █████╗ ██╗   ██╗██╗  ████████╗    ████████╗███████╗ ██████╗             ██████╗ ███████╗
+                ██║   ██║██╔══██╗██║   ██║██║  ╚══██╔══╝    ╚══██╔══╝██╔════╝██╔════╝            ██╔═══██╗██╔════╝
+                ██║   ██║███████║██║   ██║██║     ██║          ██║   █████╗  ██║       ██████╗   ██║   ██║███████╗
+                ╚██╗ ██╔╝██╔══██║██║   ██║██║     ██║          ██║   ██╔══╝  ██║       ╚═════╝   ██║   ██║╚════██║
+                 ╚████╔╝ ██║  ██║╚██████╔╝███████╗██║          ██║   ███████╗╚██████╗            ╚██████╔╝███████║
+                  ╚═══╝  ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝          ╚═╝   ╚══════╝ ╚═════╝             ╚═════╝ ╚══════╝)";
+                ImGui::SetWindowFontScale(1.0f);
+                ImVec2 baseAsciiSize = ImGui::CalcTextSize(vaultAscii);
+
+                float maxAsciiWidth = windowSize.x * 0.82f;
+                float asciiScaling = maxAsciiWidth / baseAsciiSize.x;
+                if (asciiScaling > 1.0f)
+                    asciiScaling = 1.0f;
+                if (asciiScaling < 0.40f)
+                    asciiScaling = 0.40;
+                ImGui::SetWindowFontScale(asciiScaling);
+                ImVec2 asciiSize = ImGui::CalcTextSize(vaultAscii);
+                float asciiX = centerX - (asciiSize.x * 0.58f);
+                float asciiY = windowSize.y * 0.06f;
+
+                ImGui::SetCursorPos(ImVec2(asciiX, asciiY));
+                ImGui::TextUnformatted(vaultAscii);
+
+                // vault boy gif
+                float gifHeight = windowSize.y * 0.32f;
+                float gifRatio = 1.0f;
+                if (vaultBoyHeight > 0)
+                {
+                    gifRatio = (float)vaultBoyWidth / (float)vaultBoyHeight;
+
+                }
+                float gifWidth = gifHeight * gifRatio;
+                float gifX = centerX - (gifWidth * 0.5f);
+                float gifY = asciiY + asciiSize.y + 20.0f;
+
+                if (!vaultBoyFrames.empty())
+                {
+                    int currFrame = (int)(timePassed / 0.1f) % vaultBoyFrames.size();
+                    ImGui::SetCursorPos(ImVec2(gifX, gifY));
+                    ImGui::Image((ImTextureID)(intptr_t)vaultBoyFrames[currFrame], ImVec2(gifWidth, gifHeight));
+                }
+
+                //Loading bar
+                float actualProgress = (float)(timePassed / 4.0f);
+
+                if (actualProgress > 1.0f)
+                    actualProgress = 1.0f;
+
+
+                float progressBarWidth = windowSize.x * 0.35f;
+                float progressBarHeight = 18.0f;
+                float progressBarX = centerX - (progressBarWidth * 0.5f);
+                float progressBarY = gifY + gifHeight + 25.0f;
+
+                drawList->AddRect(ImVec2(windowPos.x + progressBarX, windowPos.y + progressBarY), ImVec2(windowPos.x + progressBarX + progressBarWidth, windowPos.y + progressBarY + progressBarHeight),
+                    IM_COL32(70, 235, 105, 220), 0.0f, 0, 2.0f);
+
+                drawList->AddRectFilled(ImVec2(windowPos.x + progressBarX + 3.0f, windowPos.y + progressBarY + 3.0f), ImVec2(windowPos.x + progressBarX + 3.0f + ((progressBarWidth - 6.0f) * actualProgress),
+                    windowPos.y + progressBarY + progressBarHeight - 3.0f), IM_COL32(70, 235, 105, 180));
+
+                ImGui::SetWindowFontScale(textScaling);
+                const char* loadingTxt;
+                if (actualProgress < 0.25f)
+                {
+                    loadingTxt = "MOUNTING SYSTEM FILES...";
+                }
+                else if (actualProgress < 0.50f)
+                {
+                    loadingTxt = "INITIALIZING SYSTEM SERVICES...";
+                }
+                else if (actualProgress < 0.75f)
+                {
+                    loadingTxt = "LOADING INTERFACE MODULES...";
+                }
+                else if (actualProgress < 1.0f)
+                {
+                    loadingTxt = "PREPARING DESKTOP ENVIRONMENT...";
+                }
+                else
+                {
+                    loadingTxt = "SYSTEM IS NOW READY";
+                }
+                ImVec2 loadTxtSize = ImGui::CalcTextSize(loadingTxt);
+                ImGui::SetCursorPos(ImVec2(centerX - (loadTxtSize.x * 0.5f), progressBarY + 30.0f));
+                ImGui::TextUnformatted(loadingTxt);
+                
+                ImGui::PopStyleColor();
+                ImGui::PopFont();
+                ImGui::End();
+
+                if (timePassed >= 4.5)
+                {
+                    currScreen = stateScreen::desktopHome;
+                    stateStartTime = glfwGetTime();
+                }
+            }
+
+            else if (currScreen == stateScreen::desktopHome)
+            {
+                ImGuiIO& io = ImGui::GetIO();
+
+                ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+                ImGui::SetNextWindowSize(io.DisplaySize);
+
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+
+
+                ImGuiWindowFlags applicationChecks = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus;
+
+
+                ImGui::Begin("VaultTec-OS", nullptr, applicationChecks);
+
+                //background
+                ImVec2 windowPos = ImGui::GetWindowPos();
+                ImVec2 windowSize = ImGui::GetWindowSize();
+
+                ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+                ImU32 topColor = IM_COL32(0, 15, 1, 255);
+                ImU32 midColor = IM_COL32(0, 35, 15, 255);
+                ImU32 botColor = IM_COL32(0, 20, 1, 255);
+
+                float midY = windowPos.y + (windowSize.y * 0.42f);
+
+                drawList->AddRectFilledMultiColor(windowPos, ImVec2(windowPos.x + windowSize.x, midY), topColor, topColor, midColor, midColor);
+                drawList->AddRectFilledMultiColor(ImVec2(windowPos.x, midY), ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y), midColor, midColor, botColor, botColor);
+
+                float edgeWidth = windowSize.x * 0.12f;
+                drawList->AddRectFilledMultiColor(windowPos, ImVec2(windowPos.x + edgeWidth, windowPos.y + windowSize.y),
+                    IM_COL32(0, 0, 0, 110), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 110));
+                drawList->AddRectFilledMultiColor(ImVec2(windowPos.x + windowSize.x - edgeWidth, windowPos.y), ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y),
+                    IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 110), IM_COL32(0, 0, 0, 110), IM_COL32(0, 0, 0, 0));
+
+
+                ImGui::End();
+                ImGui::PopStyleVar(2);
+            }
+        // End of additions - Kyan
+
+
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
+        //if (show_demo_window)
+        //    ImGui::ShowDemoWindow(&show_demo_window);
 
         // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-        {
-            static float f = 0.0f;
-            static int counter = 0;
+        //{
+        //    static float f = 0.0f;
+        //    static int counter = 0;
 
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+        //    ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
 
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
+        //    ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+        //    ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+        //    ImGui::Checkbox("Another Window", &show_another_window);
 
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+        //    ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+        //    ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
 
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
+        //    if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+        //        counter++;
+        //    ImGui::SameLine();
+        //    ImGui::Text("counter = %d", counter);
 
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
-        }
+        //    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        //    ImGui::End();
+        //}
 
         // 3. Show another simple window.
-        if (show_another_window)
-        {
-            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
-            ImGui::End();
-        }
+        //if (show_another_window)
+        //{
+        //    ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+        //    ImGui::Text("Hello from another window!");
+        //    if (ImGui::Button("Close Me"))
+        //        show_another_window = false;
+        //    ImGui::End();
+        //}
 
         // Rendering
         ImGui::Render();
