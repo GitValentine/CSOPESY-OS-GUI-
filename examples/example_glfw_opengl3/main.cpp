@@ -19,6 +19,7 @@
 #include <GLES2/gl2.h>
 #endif
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
+#include <ctime> // for clock
 
 // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
 // To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
@@ -145,6 +146,18 @@ int main(int, char**)
     {
         printf("Failed to load image");
     }
+
+    // Start of additions - Luis
+    // Wallpaper
+    GLuint wallpaperTexture = 0;
+    int wallpaperWidth = 0;
+    int wallpaperHeight = 0;
+    bool loadWallpaper = loadImage("assets/wallpaper.jpg", &wallpaperTexture, &wallpaperWidth, &wallpaperHeight);
+    if (!loadWallpaper)
+    {
+        printf("Failed to load wallpaper.jpg\n");
+    }
+    // End of additions - Luis
     // Load Fonts
     // - If fonts are not explicitly loaded, Dear ImGui will select an embedded font: either AddFontDefaultVector() or AddFontDefaultBitmap().
     //   This selection is based on (style.FontSizeBase * style.FontScaleMain * style.FontScaleDpi) reaching a small threshold.
@@ -158,6 +171,7 @@ int main(int, char**)
      //Start of additions - Kyan
     ImFont* falloutFont = io.Fonts->AddFontFromFileTTF("../../misc/fonts/Px437_Verite_8x16.ttf", 12.0f * main_scale);
     IM_ASSERT(falloutFont != nullptr);
+    io.FontDefault = falloutFont;
     //End of additions - Kyan
     // 
     //style.FontSizeBase = 20.0f;
@@ -537,47 +551,143 @@ int main(int, char**)
                 }
             }
 
+            // Start of additions - Luis
+            // Desktop Home Screen
             else if (currScreen == stateScreen::desktopHome)
             {
                 ImGuiIO& io = ImGui::GetIO();
 
+                // 1. Desktop Background & Wallpaper Window
                 ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
                 ImGui::SetNextWindowSize(io.DisplaySize);
 
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
+                ImGuiWindowFlags desktopFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                    ImGuiWindowFlags_NoBringToFrontOnFocus;
 
-                ImGuiWindowFlags applicationChecks = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus;
+                if (ImGui::Begin("VaultTec-OS", nullptr, desktopFlags))
+                {
+                    ImVec2 windowPos = ImGui::GetWindowPos();
+                    ImVec2 windowSize = ImGui::GetWindowSize();
+                    ImDrawList* drawList = ImGui::GetWindowDrawList();
 
+                    // Wallpaper
+                    if (wallpaperTexture != 0)
+                    {
+                        drawList->AddImage(
+                            (ImTextureID)(intptr_t)wallpaperTexture,
+                            windowPos,
+                            ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y)
+                        );
+                    }
+                    else
+                    {
+                        ImU32 topColor = IM_COL32(0, 15, 1, 255);
+                        ImU32 midColor = IM_COL32(0, 35, 15, 255);
+                        ImU32 botColor = IM_COL32(0, 20, 1, 255);
+                        float midY = windowPos.y + (windowSize.y * 0.42f);
 
-                ImGui::Begin("VaultTec-OS", nullptr, applicationChecks);
+                        drawList->AddRectFilledMultiColor(windowPos, ImVec2(windowPos.x + windowSize.x, midY), topColor, topColor, midColor, midColor);
+                        drawList->AddRectFilledMultiColor(
+                            ImVec2(windowPos.x, midY),
+                            ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y),
+                            midColor, midColor, botColor, botColor
+                        );
+                    }
 
-                //background
-                ImVec2 windowPos = ImGui::GetWindowPos();
-                ImVec2 windowSize = ImGui::GetWindowSize();
+                    // Clock
+                    time_t now = time(0);
+                    tm* ltm = localtime(&now);
+                    char timeStr[64];
+                    if (ltm)
+                        strftime(timeStr, sizeof(timeStr), "%A %b %d, %Y | %I:%M:%S %p", ltm);
+                    else
+                        snprintf(timeStr, sizeof(timeStr), "SYSTEM TIME ERROR");
 
-                ImDrawList* drawList = ImGui::GetWindowDrawList();
-
-                ImU32 topColor = IM_COL32(0, 15, 1, 255);
-                ImU32 midColor = IM_COL32(0, 35, 15, 255);
-                ImU32 botColor = IM_COL32(0, 20, 1, 255);
-
-                float midY = windowPos.y + (windowSize.y * 0.42f);
-
-                drawList->AddRectFilledMultiColor(windowPos, ImVec2(windowPos.x + windowSize.x, midY), topColor, topColor, midColor, midColor);
-                drawList->AddRectFilledMultiColor(ImVec2(windowPos.x, midY), ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y), midColor, midColor, botColor, botColor);
-
-                float edgeWidth = windowSize.x * 0.12f;
-                drawList->AddRectFilledMultiColor(windowPos, ImVec2(windowPos.x + edgeWidth, windowPos.y + windowSize.y),
-                    IM_COL32(0, 0, 0, 110), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 110));
-                drawList->AddRectFilledMultiColor(ImVec2(windowPos.x + windowSize.x - edgeWidth, windowPos.y), ImVec2(windowPos.x + windowSize.x, windowPos.y + windowSize.y),
-                    IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 110), IM_COL32(0, 0, 0, 110), IM_COL32(0, 0, 0, 0));
-
-
+                    ImGui::SetCursorPos(ImVec2(windowSize.x - 360.0f, 15.0f));
+                    ImGui::TextColored(ImVec4(0.35f, 1.0f, 0.35f, 1.0f), "[ %s ]", timeStr);
+                }
                 ImGui::End();
                 ImGui::PopStyleVar(2);
+
+                static bool showStartMenu = false;
+                static bool showFileExplorer = false;
+
+                // Taskbar 
+                float taskbarHeight = 45.0f;
+                ImGui::SetNextWindowPos(ImVec2(0.0f, io.DisplaySize.y - taskbarHeight));
+                ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, taskbarHeight));
+
+                ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.02f, 0.08f, 0.02f, 0.95f));
+                ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.2f, 0.8f, 0.2f, 0.5f));
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+
+                ImGuiWindowFlags taskbarFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar;
+
+                if (ImGui::Begin("TaskbarPanel", nullptr, taskbarFlags))
+                {
+                    ImGui::SetCursorPosY(8.0f);
+
+                    // Button 1: Start Menu
+                    if (ImGui::Button("[VAULT-TEC]", ImVec2(110, 30))) {
+                        showStartMenu = !showStartMenu;
+                    }
+
+                    ImGui::SameLine();
+
+                    // Button 2: File Explorer
+                    if (ImGui::Button("[EXPLORER]", ImVec2(100, 30))) {
+                        showFileExplorer = !showFileExplorer;
+                    }
+                }
+                ImGui::End();
+                ImGui::PopStyleVar();
+                ImGui::PopStyleColor(2);
+
+                // Start Menu
+                if (showStartMenu)
+                {
+                    ImGui::SetNextWindowPos(ImVec2(10.0f, io.DisplaySize.y - taskbarHeight - 210.0f));
+                    ImGui::SetNextWindowSize(ImVec2(220.0f, 200.0f));
+
+                    if (ImGui::Begin("Vault-Tec Menu", &showStartMenu, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse))
+                    {
+                        ImGui::Text("ROBCO OS v1.00");
+                        ImGui::Separator();
+                        if (ImGui::MenuItem("> User Profile")) {}
+                        if (ImGui::MenuItem("> System Settings")) {}
+                    }
+                    ImGui::End();
+                }
+
+                // File Explorer 
+                if (showFileExplorer)
+                {
+                    ImGui::SetNextWindowSize(ImVec2(450.0f, 280.0f), ImGuiCond_FirstUseEver);
+
+                    if (ImGui::Begin("File Explorer", &showFileExplorer))
+                    {
+                        ImGui::Text("C:\\ROBCO\\SYSTEM32");
+                        ImGui::Separator();
+                        if (ImGui::TreeNode("Documents")) {
+                            ImGui::BulletText("sample.TXT");
+                            ImGui::BulletText("group5.DAT");
+                            ImGui::TreePop();
+                        }
+                        if (ImGui::TreeNode("System Files")) {
+                            ImGui::BulletText("BOOT.INI");
+                            ImGui::BulletText("KERNEL.SYS");
+                            ImGui::TreePop();
+                        }
+                    }
+                    ImGui::End();
+                }
             }
+            // End of additions - Luis
         // End of additions - Kyan
 
 
