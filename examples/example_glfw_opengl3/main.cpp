@@ -615,6 +615,7 @@ int main(int, char**)
 
                 static bool showStartMenu = false;
                 static bool showFileExplorer = false;
+                static bool showTaskManager = false;
 
                 // Taskbar 
                 float taskbarHeight = 45.0f;
@@ -630,6 +631,8 @@ int main(int, char**)
 
                 if (ImGui::Begin("TaskbarPanel", nullptr, taskbarFlags))
                 {
+                    float powerBtnWidth = 70.0f;
+                    float rPadding = 8.0f;
                     ImGui::SetCursorPosY(8.0f);
 
                     // Button 1: Start Menu
@@ -643,6 +646,22 @@ int main(int, char**)
                     if (ImGui::Button("[EXPLORER]", ImVec2(100, 30))) {
                         showFileExplorer = !showFileExplorer;
                     }
+                    ImGui::SameLine();
+
+                    // Button 3: Task Manager
+                    if (ImGui::Button("[TASK MANAGER]", ImVec2(130, 30)))
+                    {
+                        showTaskManager = !showTaskManager;
+                    }
+
+                    //Power Button
+                    ImGui::SameLine();
+                    ImGui::SetCursorPosX(ImGui::GetWindowWidth() - powerBtnWidth - rPadding);
+                    if (ImGui::Button("[PWR]", ImVec2(powerBtnWidth, 30)))
+                    {
+                        glfwSetWindowShouldClose(window, GLFW_TRUE);
+                    }
+
                 }
                 ImGui::End();
                 ImGui::PopStyleVar();
@@ -682,6 +701,50 @@ int main(int, char**)
                             ImGui::BulletText("BOOT.INI");
                             ImGui::BulletText("KERNEL.SYS");
                             ImGui::TreePop();
+                        }
+                    }
+                    ImGui::End();
+                }
+
+                if (showTaskManager)
+                {
+                    ImGui::SetNextWindowSize(ImVec2(600.0f, 350.0f), ImGuiCond_FirstUseEver);
+                    if (ImGui::Begin("Task Manager", &showTaskManager))
+                    {
+                        ImGui::Text("TASK MANAGER");
+                        ImGui::Separator();
+                        ImGui::Text("Processes");
+                        ImGui::Spacing();
+
+                        ImGuiTableFlags tableFlag = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp;
+                        if (ImGui::BeginTable("ProcessTable", 3, tableFlag))
+                        {
+                            ImGui::TableSetupColumn("Process");
+                            ImGui::TableSetupColumn("CPU");
+                            ImGui::TableSetupColumn("Memory");
+                            ImGui::TableHeadersRow();
+
+                            const char* processes[][3] =
+                            {
+                                { "Fallout4.exe",           "3.2%",  "84 MB" },
+                                { "Explorer.exe",           "1.4%",  "62 MB" },
+                                { "LeagueOfLegends.exe",    "0.8%",  "31 MB" },
+                                { "CSOPESY.exe",            "2.1%",  "48 MB" },
+                                { "System",                 "0.5%",  "24 MB" }
+                            };
+
+                            for (int i = 0; i < 5; i++)
+                            {
+                                ImGui::TableNextRow();
+                                ImGui::TableSetColumnIndex(0);
+                                ImGui::TextUnformatted(processes[i][0]);
+                                ImGui::TableSetColumnIndex(1);
+                                ImGui::TextUnformatted(processes[i][1]);
+                                ImGui::TableSetColumnIndex(2);
+                                ImGui::TextUnformatted(processes[i][2]);
+                            }
+
+                            ImGui::EndTable();
                         }
                     }
                     ImGui::End();
