@@ -35,4 +35,7 @@ A simple desktop-style OS mock-up created for CSOPESY using Dear ImGui, GLFW, Op
 ## Course
 
 CSOPESY  
-Semi-Major Output 2
+Semi-Major Output 4
+By: 
+Tiongco, Kyan
+Roa, Luis
